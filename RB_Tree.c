@@ -1,86 +1,89 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
-struct tree {
+typedef struct node {
     int element;
-    struct tree* left;
-    struct tree* right;
-    struct tree* parent;
+    struct node *left;
+    struct node *right;
+    struct node *parent;
     enum {RED, BLACK} color;
-};
+} node_t;
 
 
-struct tree* sibling_node(struct tree* node) {
-    if (node->parent == NULL) {
-        return NULL;
-    }
-
-    return node == node->parent->left ? node->parent->right : node->parent->left;
+_Bool isLeftChild(const node_t *const node) {
+    return node == node->parent->left;
 }
 
-struct tree* replacement_node(struct tree* node) {
-    if (node->left == NULL && node->right == NULL) {
-        return node;
-    } else if (node->left == NULL) {
-        return node->right;
-    } else if (node->right == NULL) {
-        return node->left;
-    } else {
-        node = node->right;
-        while (node->left != NULL) {
-            node = node->left;
-        }
-        return node;
-    }
+_Bool isRightChild(const node_t *const node) {
+    return node == node->parent->right;
 }
 
-void R_rotation(struct tree** node) {
-    struct tree* temp = (*node)->left;
+void R_rotation(node_t **node) {
+    node_t *temp = (*node)->left;
 
     (*node)->left->parent = (*node)->parent;
     (*node)->parent = (*node)->left;
-    if ((*node)->left->right != NULL) {
-        (*node)->left->right->parent = *node;
-    }
-
+    if (temp->right)
+        temp->right->parent = *node;
+    
     (*node)->left = temp->right;
     temp->right = *node;
     *node = temp;
 }
 
-void L_rotation(struct tree** node) {
-    struct tree* temp = (*node)->right;
+void L_rotation(node_t **node) {
+    node_t *temp = (*node)->right;
 
-    (*node)->right->parent =(*node)->parent;
+    (*node)->right->parent = (*node)->parent;
     (*node)->parent = (*node)->right;
-    if ((*node)->right->left != NULL) {
-        (*node)->right->left->parent = *node;
-    }
+    if (temp->left)
+        temp->left->parent = *node;
 
     (*node)->right = temp->left;
     temp->left = *node;
     *node = temp;
 }
 
-void RL_rotation(struct tree** node) {
-    R_rotation(&((*node)->right));
+void RL_rotation(node_t **node) {
+    R_rotation(&(*node)->right);
     L_rotation(node);
 }
 
-void LR_rotation(struct tree** node) {
-    L_rotation(&((*node)->left));
+void LR_rotation(node_t **node) {
+    L_rotation(&(*node)->left);
     R_rotation(node);
 }
 
-void rebalance_insertion(struct tree** node) {
-    if ((*node)->left != NULL && (*node)->left->color == RED) {
-        if ((*node)->left->left != NULL && (*node)->left->left->color == RED) {
+node_t *replacement_node(node_t *node) {
+    if (!node->left && !node->right)
+        return node;
+    else if (!node->left)
+        return node->right;
+    else if (!node->right)
+        return node->left;
+    else {
+        node = node->right;
+        while (node->left)
+            node = node->left;
+        return node;
+    }
+}
+
+node_t *sibling_node(const node_t *const node) {
+    if (!node)
+        return NULL;
+    
+    return node == node->parent->left ? node->parent->right : node->parent->left;
+}
+
+void rebalance_insertion(node_t **node) {
+    if ((*node)->left && (*node)->left->color == RED) {
+        if ((*node)->left->left && (*node)->left->left->color == RED) {
             R_rotation(node);
             (*node)->color = BLACK;
             (*node)->right->color = RED;
             return;
-        } else if ((*node)->left->right != NULL && (*node)->left->right->color == RED) {
+        } else if ((*node)->left->right && (*node)->left->right->color == RED) {
             LR_rotation(node);
             (*node)->color = BLACK;
             (*node)->right->color = RED;
@@ -88,13 +91,13 @@ void rebalance_insertion(struct tree** node) {
         }
     }
 
-    if ((*node)->right != NULL && (*node)->right->color == RED) {
-        if ((*node)->right->right != NULL && (*node)->right->right->color == RED) {
+    if ((*node)->right && (*node)->right->color == RED) {
+        if ((*node)->right->right && (*node)->right->right->color == RED) {
             L_rotation(node);
             (*node)->color = BLACK;
             (*node)->left->color = RED;
             return;
-        } else if ((*node)->right->left != NULL && (*node)->right->left->color == RED) {
+        } else if ((*node)->right->left && (*node)->right->left->color == RED) {
             RL_rotation(node);
             (*node)->color = BLACK;
             (*node)->left->color = RED;
@@ -103,176 +106,168 @@ void rebalance_insertion(struct tree** node) {
     }
 }
 
-void recolor_insertion(struct tree** root, struct tree** node) {
-    struct tree *temp = *node, *sibling = sibling_node(temp);
+void recolor_insertion(node_t **root, node_t **node) {
+    node_t *sibling = sibling_node(*node);
 
-    if (sibling == NULL || sibling->color == BLACK) {
-        if (temp->parent->parent == NULL) {
+    if (!sibling || sibling->color == BLACK) {
+        if (!(*node)->parent->parent)
             rebalance_insertion(root);
-        } else {
-            if (temp->parent == temp->parent->parent->left) {
-                rebalance_insertion(&(temp->parent->parent->left));
-            } else if (temp->parent == temp->parent->parent->right) {
-                rebalance_insertion(&(temp->parent->parent->right));
-            }
+        else {
+            if (isLeftChild((*node)->parent))
+                rebalance_insertion(&(*node)->parent->parent->left);
+            else if (isRightChild((*node)->parent))
+                rebalance_insertion(&(*node)->parent->parent->right);
         }
     } else if (sibling->color == RED) {
-        temp->color = BLACK;
+        (*node)->color = BLACK;
         sibling->color = BLACK;
 
-        if (temp->parent->parent != NULL) {
-            temp->parent->color = RED;
+        if ((*node)->parent->parent) {
+            (*node)->parent->color = RED;
 
-            if (temp->parent->parent->color == RED) {
-                recolor_insertion(root, &(temp->parent->parent));
-            }
+            if ((*node)->parent->parent->color == RED)
+                recolor_insertion(root, &(*node)->parent->parent);
         }
     }
 }
 
-void insert(struct tree** root, int el) {
-    struct tree* temp = *root;
+void insert(node_t **root, int el) {
+    node_t *temp = *root;
 
-    struct tree* node = (struct tree*) malloc(sizeof(struct tree));
+    node_t *node = (node_t*) malloc(sizeof(node_t));
     node->element = el;
     node->left = NULL;
     node->right = NULL;
     node->color = RED;
 
-    if (*root == NULL) {
-        node->color = BLACK;
+    if (!*root) {
         node->parent = NULL;
+        node->color = BLACK;
         *root = node;
         return;
     }
 
     while (temp) {
         if (el < temp->element) {
-            if (temp->left == NULL) {
+            if (!temp->left) {
                 node->parent = temp;
                 temp->left = node;
-                if (temp->color == RED) {
+                if (temp->color == RED)
                     recolor_insertion(root, &temp);
-                }
                 return;
             }
             temp = temp->left;
         } else if (el > temp->element) {
-            if (temp->right == NULL) {
+            if (!temp->right) {
                 node->parent = temp;
                 temp->right = node;
-                if (temp->color == RED) {
+                if (temp->color == RED)
                     recolor_insertion(root, &temp);
-                }
                 return;
             }
             temp = temp->right;
         } else {
+            fprintf(stderr, "This element already exists!\n");
             return;
         }
     }
 }
 
-void swap_colors(struct tree* a, struct tree* b) {
+void swap_colors(node_t *const a, node_t *const b) {
     int temp = a->color;
 
     a->color = b->color;
     b->color = temp;
 }
 
-void rebalance_deletion(struct tree** root, struct tree** replacement) {
-    struct tree* sibling = sibling_node(*replacement);
+void rebalance_deletion(node_t **root, node_t **replacement) {
+    node_t *sibling = sibling_node(*replacement);
 
     switch ((*replacement)->color) {
         case RED:
             return;
-
+        
         case BLACK:
             switch (sibling->color) {
                 case RED:
-                    swap_colors((*replacement)->parent, sibling);
+                    swap_colors(sibling, (*replacement)->parent);
 
-                    if ((*replacement)->parent->parent == NULL) {
-                        if (*replacement == (*replacement)->parent->left) {
+                    if (!(*replacement)->parent->parent) {
+                        if (isLeftChild(*replacement))
                             L_rotation(root);
-                        } else if (*replacement == (*replacement)->parent->right) {
+                        else if (isRightChild(*replacement))
                             R_rotation(root);
-                        }
                     } else {
-                        if (*replacement == (*replacement)->parent->left) {
-                            if ((*replacement)->parent == (*replacement)->parent->parent->left) {
-                                L_rotation(&((*replacement)->parent->parent->left));
-                            } else if ((*replacement)->parent == (*replacement)->parent->parent->right) {
-                                L_rotation(&((*replacement)->parent->parent->right));
-                            }
-                        } else if (*replacement == (*replacement)->parent->right) {
-                            if ((*replacement)->parent == (*replacement)->parent->parent->left) {
-                                R_rotation(&((*replacement)->parent->parent->left));
-                            } else if ((*replacement)->parent == (*replacement)->parent->parent->right) {
-                                R_rotation(&((*replacement)->parent->parent->right));
-                            }
+                        if (isLeftChild(*replacement)) {
+                            if (isLeftChild((*replacement)->parent))
+                                L_rotation(&(*replacement)->parent->parent->left);
+                            else if (isRightChild((*replacement)->parent))
+                                L_rotation(&(*replacement)->parent->parent->right);
+                        } else if (isRightChild(*replacement)) {
+                            if (isLeftChild((*replacement)->parent))
+                                R_rotation(&(*replacement)->parent->parent->left);
+                            else if (isRightChild((*replacement)->parent))
+                                R_rotation(&(*replacement)->parent->parent->right);
                         }
                     }
 
                     rebalance_deletion(root, replacement);
                     break;
-
+                
                 case BLACK:
-                    if (sibling->left != NULL && sibling->left->color == RED) {
-                        if (*replacement == (*replacement)->parent->left) {
+                    if (sibling->left && sibling->left->color == RED) {
+                        if (isLeftChild(*replacement)) {
                             swap_colors(sibling, sibling->left);
-                            R_rotation(&((*replacement)->parent->right));
+                            R_rotation(&(*replacement)->parent->right);
 
                             rebalance_deletion(root, replacement);
-                        } else if (*replacement == (*replacement)->parent->right) {
-                            swap_colors(sibling, (*replacement)->parent);
+                        } else if (isRightChild(*replacement)) {
                             sibling->left->color = BLACK;
 
-                            if ((*replacement)->parent->parent == NULL) {
+                            if (!(*replacement)->parent->parent)
                                 R_rotation(root);
-                            } else {
-                                if ((*replacement)->parent == (*replacement)->parent->parent->left) {
-                                    R_rotation(&((*replacement)->parent->parent->left));
-                                } else if ((*replacement)->parent == (*replacement)->parent->parent->right) {
-                                    R_rotation(&((*replacement)->parent->parent->right));
-                                }
+                            else {
+                                if (isLeftChild((*replacement)->parent))
+                                    R_rotation(&(*replacement)->parent->parent->left);
+                                else if (isRightChild((*replacement)->parent))
+                                    R_rotation(&(*replacement)->parent->parent->right);
                             }
                         }
-                    } else if (sibling->right != NULL && sibling->right->color == RED) {
-                        if (*replacement == (*replacement)->parent->left) {
-                            swap_colors(sibling, (*replacement)->parent);
+                    } else if (sibling->right && sibling->right->color == RED) {
+                        if (isLeftChild(*replacement)) {
                             sibling->right->color = BLACK;
 
-                            if ((*replacement)->parent->parent == NULL) {
+                            if (!(*replacement)->parent->parent)
                                 L_rotation(root);
-                            } else {
-                                if ((*replacement)->parent == (*replacement)->parent->parent->left) {
-                                    L_rotation(&((*replacement)->parent->parent->left));
-                                } else if ((*replacement)->parent == (*replacement)->parent->parent->right) {
-                                    L_rotation(&((*replacement)->parent->parent->right));
-                                }
+                            else {
+                                if (isLeftChild((*replacement)->parent))
+                                    L_rotation(&(*replacement)->parent->parent->left);
+                                else if (isRightChild((*replacement)->parent))
+                                    L_rotation(&(*replacement)->parent->parent->right);
                             }
-                        } else if (*replacement == (*replacement)->parent->right) {
+                        } else if (isRightChild(*replacement)) {
                             swap_colors(sibling, sibling->right);
-                            L_rotation(&((*replacement)->parent->left));
+                            L_rotation(&(*replacement)->parent->right);
 
                             rebalance_deletion(root, replacement);
                         }
                     } else {
                         sibling->color = RED;
 
-                        if ((*replacement)->parent->color == RED) {
-                            (*replacement)->parent->color = BLACK;
-                        } else if ((*replacement)->parent->color == BLACK) {
-                            if ((*replacement)->parent->parent == NULL) {
-                                return;
-                            }
-
-                            if ((*replacement)->parent == (*replacement)->parent->parent->left) {
-                                rebalance_deletion(root, &((*replacement)->parent->parent->left));
-                            } else if ((*replacement)->parent == (*replacement)->parent->parent->right) {
-                                rebalance_deletion(root, &((*replacement)->parent->parent->right));
-                            }
+                        switch ((*replacement)->parent->color) {
+                            case RED:
+                                (*replacement)->parent->color = BLACK;
+                                break;
+                            
+                            case BLACK:
+                                if (!(*replacement)->parent->parent)
+                                    return;
+                                
+                                if (isLeftChild((*replacement)->parent))
+                                    rebalance_deletion(root, &(*replacement)->parent->parent->left);
+                                else if (isRightChild((*replacement)->parent))
+                                    rebalance_deletion(root, &(*replacement)->parent->parent->right);
+                                break;
                         }
                     }
                     break;
@@ -281,90 +276,96 @@ void rebalance_deletion(struct tree** root, struct tree** replacement) {
     }
 }
 
-void recolor_deletion(struct tree** root, struct tree** replacement) {
-    if ((*replacement)->left == NULL && (*replacement)->right == NULL) {
+void recolor_deletion(node_t **root, node_t **replacement) {
+    if (!(*replacement)->left && !(*replacement)->right)
         rebalance_deletion(root, replacement);
-    } else {
+    else
         swap_colors(*replacement, (*replacement)->right);
-    }
 }
 
-void deletion(struct tree** root, struct tree** node, int el) {
-    struct tree* replacement = replacement_node(*node), *temp = *node;
+void deletion(node_t **root, node_t **node) {
+    node_t *temp = *node, *replacement = replacement_node(*node);
 
     (*node)->element = replacement->element;
     recolor_deletion(root, &replacement);
 
-    if ((*node)->left == NULL && (*node)->right == NULL) {
+    if (!(*node)->left && !(*node)->right) {
         *node = NULL;
-    } else if ((*node)->left == NULL) {
+    } else if (!(*node)->left) {
         replacement = *node;
         (*node)->right->parent = (*node)->parent;
         *node = (*node)->right;
-    } else if ((*node)->right == NULL) {
+        if (!(*node)->parent)
+            (*node)->color = BLACK;
+    } else if (!(*node)->right) {
         replacement = *node;
         (*node)->left->parent = (*node)->parent;
         *node = (*node)->left;
+        if (!(*node)->parent)
+            (*node)->color = BLACK;
     } else {
-        if ((*node)->right->left == NULL) {
-            if (replacement->right != NULL) {
-                replacement->right->parent = *node;
-            }
+        if (!(*node)->right->left) {
+            if (replacement->right)
+                replacement->right->parent = (*node)->parent;
             temp->right = replacement->right;
         } else {
-            if (replacement->right != NULL) {
+            if (replacement->right)
                 replacement->right->parent = replacement->parent;
-            }
             replacement->parent->left = replacement->right;
         }
     }
+
     free(replacement);
 }
 
-void delete(struct tree** root, int el) {
-    struct tree* temp = *root;
+void delete(node_t **root, int el) {
+    node_t *temp = *root;
 
-    if ((*root)->element == el) {
-        deletion(root, root, el);
+    if (el == (*root)->element) {
+        deletion(root, root);
         return;
-    } else {
-        while (temp) {
-            if (el < temp->element) {
-                if (temp->left->element == el) {
-                    deletion(root, &(temp->left), el);
-                    return;
-                }
-                temp = temp->left;
-            } else if (el > temp->element) {
-                if (temp->right->element == el) {
-                    deletion(root, &(temp->right), el);
-                    return;
-                }
-                temp = temp->right;
+    }
+
+    while (temp) {
+        if (el < temp->element) {
+            if (temp->left && el == temp->left->element) {
+                deletion(root, &temp->left);
+                return;
             }
+            temp = temp->left;
+        } else if (el > temp->element) {
+            if (temp->right && el == temp->right->element) {
+                deletion(root, &temp->right);
+                return;
+            }
+            temp = temp->right;
         }
     }
+
+    fprintf(stderr, "There is no such element!\n");
 }
 
-void show_tree_helper(struct tree* root, int level) {
-    if (!root) {
+void show_tree_helper(const node_t *const root, unsigned int level) {
+    if (!root)
         return;
-    }
 
-    for (int i = 0; i < level+1; i++) {
+    for (int i = 0; i < level+1; i++)
         printf("   ");
-    }
 
-    if (root->color == RED) {
-        printf("\x1b[31m%d\x1b[0m\n", root->element);
-    } else if (root->color == BLACK) {
-        printf("%d\n", root->element);
+    switch (root->color) {
+        case RED:
+            printf("\x1b[31m%d\x1b[0m\n", root->element);
+            break;
+
+        case BLACK:
+            printf("%d\n", root->element);
+        break;
     }
 
     show_tree_helper(root->left, level+1);
     show_tree_helper(root->right, level+1);
 }
 
-void show_tree(struct tree* root) {
+void show_tree(const node_t *const root) {
     show_tree_helper(root, 0);
 }
